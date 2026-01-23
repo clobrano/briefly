@@ -1,0 +1,66 @@
+# Briefly Configuration Example
+#
+# This file shows all available configuration options.
+# Currently, Briefly uses environment variables for configuration.
+# Copy this file to understand the available settings.
+
+# Directory Configuration
+# -----------------------
+# BRIEFLY_WATCH_DIR: Directory to monitor for input files
+# Default: /data/inbox
+# Example: export BRIEFLY_WATCH_DIR=/home/user/briefly/inbox
+
+# BRIEFLY_OUTPUT_DIR: Directory where summaries are saved
+# Default: /data/output
+# Example: export BRIEFLY_OUTPUT_DIR=/home/user/briefly/output
+
+# LLM Provider Configuration
+# --------------------------
+# BRIEFLY_LLM_PROVIDER: Which LLM to use for summarization
+# Options: "claude" or "gemini"
+# Default: claude
+# Example: export BRIEFLY_LLM_PROVIDER=claude
+
+# ANTHROPIC_API_KEY: API key for Claude (required if using claude provider)
+# Example: export ANTHROPIC_API_KEY=sk-ant-...
+
+# GOOGLE_API_KEY: API key for Gemini (required if using gemini provider)
+# Example: export GOOGLE_API_KEY=AIza...
+
+# Whisper Configuration
+# ---------------------
+# BRIEFLY_WHISPER_MODEL: Model size for Whisper transcription
+# Options: tiny, base, small, medium, large
+# Default: base
+# Note: Larger models are more accurate but slower and use more memory
+# Example: export BRIEFLY_WHISPER_MODEL=small
+
+# Notification Configuration
+# --------------------------
+# BRIEFLY_NTFY_TOPIC: ntfy.sh topic for notifications
+# If not set, notifications are disabled
+# Example: export BRIEFLY_NTFY_TOPIC=my-briefly-notifications
+
+# Input File Format
+# -----------------
+# Briefly watches for files with extensions: .briefly, .url, .txt
+#
+# Simple format (URL only):
+#   https://www.youtube.com/watch?v=xyz
+#
+# Extended format (YAML front matter):
+#   ---
+#   url: https://www.youtube.com/watch?v=xyz
+#   prompt: |
+#     Custom summarization instructions here.
+#     Focus on the main points and key takeaways.
+#   ---
+
+# Docker/Podman Usage
+# -------------------
+# podman run -d \
+#   -e ANTHROPIC_API_KEY=your-key \
+#   -e BRIEFLY_NTFY_TOPIC=my-topic \
+#   -v /path/to/inbox:/data/inbox:z \
+#   -v /path/to/output:/data/output:z \
+#   briefly:latest
