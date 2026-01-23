@@ -274,6 +274,32 @@ If you see errors like `permission denied` when reading input files:
    podman exec briefly ls -la /data/inbox/
    ```
 
+## CI/CD
+
+### Automated Container Builds
+
+This repository automatically builds and pushes container images to `quay.io/clobrano/briefly` when pull requests are merged to the main branch.
+
+**Required GitHub Secrets:**
+
+To enable automatic pushing to Quay.io, configure these secrets in your repository settings (Settings → Secrets and variables → Actions):
+
+- `QUAY_USERNAME`: Your Quay.io username or robot account name
+- `QUAY_TOKEN`: Your Quay.io password or robot account token
+
+**Image Tags:**
+
+The workflow automatically creates the following tags:
+- `latest`: Always points to the most recent build from main
+- `main-<sha>`: Tagged with the git commit SHA (e.g., `main-a1b2c3d`)
+- Semantic version tags if you create git tags (e.g., `v1.0.0`)
+
+**Pulling the Image:**
+
+```bash
+podman pull quay.io/clobrano/briefly:latest
+```
+
 ## License
 
 MIT
