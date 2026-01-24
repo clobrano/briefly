@@ -34,8 +34,9 @@ func (n *Notifier) SendStart(ctx context.Context, job *models.Job) error {
 
 	title := fmt.Sprintf("Briefly: processing %s", job.ContentType)
 	message := fmt.Sprintf("Started processing %s\n\nFile: %s", job.URL, job.Filename)
+	tag := n.getTagForContentType(job.ContentType)
 
-	return n.send(ctx, title, message, "default", "hourglass")
+	return n.send(ctx, title, message, "default", tag)
 }
 
 func (n *Notifier) SendSuccess(ctx context.Context, job *models.Job) error {
@@ -45,8 +46,9 @@ func (n *Notifier) SendSuccess(ctx context.Context, job *models.Job) error {
 
 	title := fmt.Sprintf("Briefly: %s summary ready", job.ContentType)
 	message := fmt.Sprintf("Summary for %s is ready.\n\nFile: %s", job.URL, job.Filename)
+	tag := n.getTagForContentType(job.ContentType)
 
-	return n.send(ctx, title, message, "default", "white_check_mark")
+	return n.send(ctx, title, message, "default", tag)
 }
 
 func (n *Notifier) SendFailure(ctx context.Context, job *models.Job) error {
@@ -58,6 +60,17 @@ func (n *Notifier) SendFailure(ctx context.Context, job *models.Job) error {
 	message := fmt.Sprintf("Failed to process %s\n\nError: %s\n\nFile: %s", job.URL, job.Error, job.Filename)
 
 	return n.send(ctx, title, message, "high", "x")
+}
+
+func (n *Notifier) getTagForContentType(contentType models.ContentType) string {
+	switch contentType {
+	case models.ContentTypeYouTube:
+		return "video"
+	case models.ContentTypeText:
+		return "reading"
+	default:
+		return "hourglass"
+	}
 }
 
 func (n *Notifier) send(ctx context.Context, title, message, priority, tags string) error {

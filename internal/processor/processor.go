@@ -84,18 +84,18 @@ func (p *Processor) processJob(job *models.Job) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
+	// Detect content type first
+	job.ContentType = DetectContentType(job.URL)
+	if job.ContentType == models.ContentTypeUnknown {
+		p.failJob(job, fmt.Errorf("unknown content type for URL: %s", job.URL))
+		return
+	}
+
 	// Send start notification
 	if p.notifier != nil {
 		if err := p.notifier.SendStart(ctx, job); err != nil {
 			log.Printf("Warning: failed to send start notification for job %s: %v", job.Filename, err)
 		}
-	}
-
-	// Detect content type
-	job.ContentType = DetectContentType(job.URL)
-	if job.ContentType == models.ContentTypeUnknown {
-		p.failJob(job, fmt.Errorf("unknown content type for URL: %s", job.URL))
-		return
 	}
 
 	// Extract content
