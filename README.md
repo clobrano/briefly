@@ -108,50 +108,134 @@ podman-compose up -d
 
 ### Protecting Sensitive Information
 
-The `.env` file contains sensitive credentials (API keys, ntfy topics) and should be protected:
+**IMPORTANT:** The `.env` file stores secrets in **plaintext** on your filesystem. While `.gitignore` prevents it from being committed to version control, anyone with filesystem access can read it.
 
-**Critical:**
-- `.env` is in `.gitignore` and will never be committed to version control
-- Never share your `.env` file or commit it to any repository
-- Use `.env.example` as a template but never put real credentials in it
+For better security, consider **not storing secrets in `.env` files**:
 
-**Recommended practices:**
+### Option 1: Docker Secrets (Recommended for Production)
 
-1. **File permissions**: Restrict access to the .env file
-   ```bash
-   chmod 600 .env
-   ```
+Secrets are encrypted and never exposed in plaintext:
 
-2. **ntfy.sh topics**: Choose unpredictable topic names to prevent unauthorized access
-   ```bash
-   # Bad (predictable):
-   BRIEFLY_NTFY_TOPIC=my-briefly-notifications
+```bash
+# Create secrets (stored encrypted by Docker)
+echo "your-api-key" | docker secret create anthropic_api_key -
+echo "your-ntfy-topic" | docker secret create ntfy_topic -
+echo "your-google-key" | docker secret create google_api_key -
 
-   # Good (random/unique):
-   BRIEFLY_NTFY_TOPIC=briefly-8f3k2n9x-notifications
-   ```
+# Enable swarm mode (required for secrets)
+docker swarm init
 
-   Subscribe to your topic at `https://ntfy.sh/your-topic` or use the ntfy mobile app. Anyone who knows the topic name can subscribe, so treat it as sensitive.
+# Deploy with secrets
+docker stack deploy -c docker-compose.yml -c docker-compose.secrets.yml briefly
+```
 
-3. **Docker Secrets** (Production): For production environments, use Docker secrets instead of environment variables:
-   ```bash
-   # Create secrets
-   echo "your-api-key" | docker secret create anthropic_api_key -
-   echo "your-ntfy-topic" | docker secret create ntfy_topic -
+**Benefits:**
+- Secrets never written to disk in plaintext
+- Not visible in container inspect or logs
+- Encrypted at rest and in transit
 
-   # Use docker-compose.secrets.yml (see example in repo)
-   docker compose -f docker-compose.yml -f docker-compose.secrets.yml up -d
-   ```
+### Option 2: Environment Variables (Without .env)
 
-4. **Environment isolation**: Use different API keys and ntfy topics for development and production
+Docker Compose automatically reads from your shell environment, so you **don't need a .env file**.
 
-5. **Key rotation**: Regularly rotate API keys and update your `.env` file
+Best for personal servers where you control the environment:
 
-### What Gets Protected
+```bash
+# Option A: Set in current shell
+export ANTHROPIC_API_KEY="your-api-key"
+export BRIEFLY_NTFY_TOPIC="your-topic-name"
 
-The `.gitignore` file ensures these sensitive items are never committed:
-- `.env` - Your actual configuration with real credentials
-- `inbox/` - Your input files may contain private URLs
+# Start without .env file (compose reads from environment)
+docker compose up -d
+```
+
+```bash
+# Option B: Pass directly to docker compose
+ANTHROPIC_API_KEY="your-key" BRIEFLY_NTFY_TOPIC="your-topic" docker compose up -d
+```
+
+```bash
+# Option C: Integrate with a secrets vault
+# HashiCorp Vault
+export ANTHROPIC_API_KEY=$(vault kv get -field=api_key secret/briefly)
+export BRIEFLY_NTFY_TOPIC=$(vault kv get -field=ntfy_topic secret/briefly)
+docker compose up -d
+
+# 1Password CLI
+export ANTHROPIC_API_KEY=$(op read "op://Personal/Briefly/api_key")
+export BRIEFLY_NTFY_TOPIC=$(op read "op://Personal/Briefly/ntfy_topic")
+docker compose up -d
+
+# AWS Secrets Manager
+export ANTHROPIC_API_KEY=$(aws secretsmanager get-secret-value --secret-id briefly/api_key --query SecretString --output text)
+docker compose up -d
+```
+
+```bash
+# Option D: Create systemd service with environment variables
+# /etc/systemd/system/briefly.service
+[Service]
+Environment="ANTHROPIC_API_KEY=your-api-key"
+Environment="BRIEFLY_NTFY_TOPIC=your-topic-name"
+Environment="BRIEFLY_HOST_INBOX=/home/user/inbox"
+Environment="BRIEFLY_HOST_OUTPUT=/home/user/output"
+ExecStart=/usr/bin/docker compose -f /path/to/docker-compose.yml up
+WorkingDirectory=/path/to/briefly
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**Benefits:**
+- Secrets only in memory/process environment
+- Not written to disk (unless shell history enabled)
+- Integrates with existing secrets management tools
+- No .env file to secure or manage
+
+### Option 3: .env File (Least Secure)
+
+Only use for quick testing if you accept the risks:
+
+```bash
+cp .env.example .env
+chmod 600 .env  # Restrict to owner only
+nano .env       # Add your secrets
+```
+
+**Limitations:**
+- Secrets stored in **plaintext** on disk
+- Visible to anyone with filesystem access
+- Can be leaked in backups, logs, or snapshots
+
+### ntfy.sh Topic Security
+
+**Important:** Anyone who knows your ntfy topic name can subscribe to your notifications.
+
+Use your preferred topic name, but **keep it secret**:
+- ✅ Store it using Docker secrets (never on disk)
+- ✅ Set it as an environment variable (only in memory)
+- ⚠️ If using `.env`, ensure `chmod 600 .env`
+- ❌ Never commit it to version control
+- ❌ Never share it publicly
+
+Subscribe to your topic at `https://ntfy.sh/your-topic` or use the ntfy mobile app.
+
+### Additional Security
+
+1. **Environment isolation**: Use different API keys and ntfy topics for development and production
+
+2. **Key rotation**: Regularly rotate API keys and update your configuration
+
+3. **Audit access**: Monitor who has access to your server/filesystem
+
+4. **Backups**: Ensure backup systems don't expose `.env` files
+
+### What .gitignore Protects
+
+These files are excluded from version control:
+- `.env` - Configuration with credentials (still visible on filesystem!)
+- `inbox/` - Input files may contain private URLs
 - `output/` - Generated summaries may contain sensitive content
 
 ## Configuration

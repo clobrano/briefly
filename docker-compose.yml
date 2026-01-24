@@ -1,5 +1,23 @@
 version: '3.8'
 
+# ENVIRONMENT VARIABLE PRECEDENCE:
+# Docker Compose reads variables in this order (first match wins):
+#   1. Shell environment variables (export ANTHROPIC_API_KEY=...)
+#   2. .env file in the same directory
+#   3. Default values specified with ${VAR:-default}
+#
+# SECURE USAGE (no .env file needed):
+#   export ANTHROPIC_API_KEY="your-key"
+#   export BRIEFLY_NTFY_TOPIC="your-topic"
+#   docker compose up -d
+#
+# OR use a single command:
+#   ANTHROPIC_API_KEY="your-key" docker compose up -d
+#
+# OR integrate with a vault (HashiCorp Vault, 1Password, etc):
+#   export ANTHROPIC_API_KEY=$(vault kv get -field=api_key secret/briefly)
+#   docker compose up -d
+
 services:
   # Main Briefly service
   briefly:
