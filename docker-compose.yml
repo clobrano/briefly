@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  # Main Briefly service
+  briefly:
+    image: briefly:latest
+    container_name: briefly
+    restart: unless-stopped
+    environment:
+      # LLM Provider Configuration
+      - BRIEFLY_LLM_PROVIDER=${BRIEFLY_LLM_PROVIDER:-claude}
+      - BRIEFLY_LLM_MODEL=${BRIEFLY_LLM_MODEL:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+
+      # Directory Configuration
+      - BRIEFLY_WATCH_DIR=/data/inbox
+      - BRIEFLY_OUTPUT_DIR=/data/output
+
+      # Whisper Configuration
+      - BRIEFLY_WHISPER_MODEL=${BRIEFLY_WHISPER_MODEL:-base}
+
+      # Notification Configuration
+      - BRIEFLY_NTFY_TOPIC=${BRIEFLY_NTFY_TOPIC:-}
+    volumes:
+      # Mount host directories for input and output
+      # Adjust these paths to your needs
+      - ${BRIEFLY_HOST_INBOX:-./inbox}:/data/inbox
+      - ${BRIEFLY_HOST_OUTPUT:-./output}:/data/output
+    labels:
+      # Enable Watchtower monitoring for this container
+      - "com.centurylinklabs.watchtower.enable=true"
+    networks:
+      - briefly-network
+
+  # Watchtower - Automatic container updates
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: watchtower
+    restart: unless-stopped
+    environment:
+      # Update check interval (default: 24 hours)
+      # Format: seconds (e.g., 3600 = 1 hour, 86400 = 24 hours)
+      - WATCHTOWER_POLL_INTERVAL=${WATCHTOWER_POLL_INTERVAL:-86400}
+
+      # Cleanup old images after update
+      - WATCHTOWER_CLEANUP=true
+
+      # Include stopped containers in updates
+      - WATCHTOWER_INCLUDE_STOPPED=true
+
+      # Include restarting containers
+      - WATCHTOWER_INCLUDE_RESTARTING=true
+
+      # Only monitor containers with the watchtower label
+      - WATCHTOWER_LABEL_ENABLE=true
+
+      # Notification settings (optional)
+      # Uncomment and configure if you want Watchtower notifications
+      # - WATCHTOWER_NOTIFICATIONS=shoutrrr
+      # - WATCHTOWER_NOTIFICATION_URL=smtp://username:password@host:port/?from=fromAddress&to=toAddress
+
+      # Debug mode (set to true for verbose logging)
+      - WATCHTOWER_DEBUG=${WATCHTOWER_DEBUG:-false}
+
+      # Rolling restart (update one container at a time)
+      - WATCHTOWER_ROLLING_RESTART=false
+    volumes:
+      # Mount Docker socket to allow Watchtower to manage containers
+      # For Docker:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # For Podman (uncomment and adjust if using Podman):
+      # - /run/user/1000/podman/podman.sock:/var/run/docker.sock
+    networks:
+      - briefly-network
+    labels:
+      # Prevent Watchtower from updating itself
+      - "com.centurylinklabs.watchtower.enable=false"
+
+networks:
+  briefly-network:
+    driver: bridge

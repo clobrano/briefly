@@ -42,6 +42,68 @@ go build -o briefly ./cmd/briefly
 podman build -t briefly:latest -f Containerfile .
 ```
 
+## Docker Compose Configuration
+
+The project includes a `docker-compose.yml` file that sets up Briefly with Watchtower for automatic image updates.
+
+### Features
+
+- **Automatic updates**: Watchtower checks for new images every 24 hours (configurable)
+- **Zero-downtime updates**: Containers are restarted automatically when updates are available
+- **Cleanup**: Old images are removed after successful updates
+- **Easy configuration**: All settings in `.env` file
+
+### Quick Start
+
+1. Copy the example environment file:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Edit `.env` and set your API key:
+   ```bash
+   ANTHROPIC_API_KEY=your-actual-api-key-here
+   ```
+
+3. Start the services:
+   ```bash
+   docker compose up -d
+   ```
+
+4. Check the logs:
+   ```bash
+   docker compose logs -f briefly
+   ```
+
+### Watchtower Configuration
+
+Watchtower settings in `.env`:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `WATCHTOWER_POLL_INTERVAL` | `86400` | Update check interval in seconds (86400 = 24 hours) |
+| `WATCHTOWER_DEBUG` | `false` | Enable verbose logging |
+
+**Notification options:**
+- Email: Set `WATCHTOWER_NOTIFICATION_URL` to SMTP URL
+- ntfy.sh: Set `WATCHTOWER_NOTIFICATION_URL` to `ntfy://ntfy.sh/your-topic`
+
+See `.env.example` for detailed notification configuration examples.
+
+### Using with Podman
+
+To use with Podman instead of Docker:
+
+```bash
+# Update the docker-compose.yml Watchtower volume to use Podman socket
+# Replace:
+#   - /var/run/docker.sock:/var/run/docker.sock
+# With:
+#   - /run/user/1000/podman/podman.sock:/var/run/docker.sock
+
+podman-compose up -d
+```
+
 ## Configuration
 
 Briefly uses environment variables for configuration:
@@ -90,7 +152,31 @@ mkdir -p $BRIEFLY_WATCH_DIR $BRIEFLY_OUTPUT_DIR
 
 ### Running with container
 
-**Recommended (rootless Podman with user namespace mapping):**
+**Recommended (Docker Compose with automatic updates):**
+
+```bash
+# Copy and configure environment file
+cp .env.example .env
+# Edit .env with your API keys and settings
+nano .env
+
+# Start services (Briefly + Watchtower for auto-updates)
+docker compose up -d
+
+# View logs
+docker compose logs -f briefly
+
+# Stop services
+docker compose down
+```
+
+Docker Compose automatically:
+- Pulls and runs the Briefly service
+- Configures Watchtower to check for image updates every 24 hours
+- Restarts containers when updates are available
+- Cleans up old images
+
+**Alternative (Manual Podman with user namespace mapping):**
 
 ```bash
 podman run -d \
