@@ -64,58 +64,59 @@ services:
       - briefly-network
 
   # Watchtower - Automatic container updates
-  watchtower:
-    image: containrrr/watchtower:latest
-    container_name: watchtower
-    restart: unless-stopped
-    environment:
-      # Update check interval (default: 24 hours)
-      # Format: seconds (e.g., 3600 = 1 hour, 86400 = 24 hours)
-      - WATCHTOWER_POLL_INTERVAL=${WATCHTOWER_POLL_INTERVAL:-86400}
-
-      # Cleanup old images after update
-      - WATCHTOWER_CLEANUP=true
-
-      # Include stopped containers in updates
-      - WATCHTOWER_INCLUDE_STOPPED=true
-
-      # Include restarting containers
-      - WATCHTOWER_INCLUDE_RESTARTING=true
-
-      # Only monitor containers with the watchtower label
-      - WATCHTOWER_LABEL_ENABLE=true
-
-      # Notification settings (optional)
-      # Uncomment and configure if you want Watchtower notifications
-      # - WATCHTOWER_NOTIFICATIONS=shoutrrr
-      # - WATCHTOWER_NOTIFICATION_URL=smtp://username:password@host:port/?from=fromAddress&to=toAddress
-
-      # Debug mode (set to true for verbose logging)
-      - WATCHTOWER_DEBUG=${WATCHTOWER_DEBUG:-false}
-
-      # Rolling restart (update one container at a time)
-      - WATCHTOWER_ROLLING_RESTART=false
-    volumes:
-      # Mount container runtime socket to allow Watchtower to manage containers
-
-      # For Docker (default):
-      # - /var/run/docker.sock:/var/run/docker.sock
-
-      # For Podman (rootful - running as root):
-      - /run/podman/podman.sock:/var/run/docker.sock
-
-      # For Podman (rootless - running as regular user):
-      # Replace 1000 with your UID (run: echo $UID)
-      # - /run/user/1000/podman/podman.sock:/var/run/docker.sock
-
-      # NOTE: Podman socket must be enabled first:
-      #   Rootful:   sudo systemctl enable --now podman.socket
-      #   Rootless:  systemctl --user enable --now podman.socket
-    networks:
-      - briefly-network
-    labels:
-      # Prevent Watchtower from updating itself
-      - "com.centurylinklabs.watchtower.enable=false"
+  # DISABLED: Uncomment to enable automatic updates when Podman socket is available
+  # watchtower:
+  #   image: containrrr/watchtower:latest
+  #   container_name: watchtower
+  #   restart: unless-stopped
+  #   environment:
+  #     # Update check interval (default: 24 hours)
+  #     # Format: seconds (e.g., 3600 = 1 hour, 86400 = 24 hours)
+  #     - WATCHTOWER_POLL_INTERVAL=${WATCHTOWER_POLL_INTERVAL:-86400}
+  #
+  #     # Cleanup old images after update
+  #     - WATCHTOWER_CLEANUP=true
+  #
+  #     # Include stopped containers in updates
+  #     - WATCHTOWER_INCLUDE_STOPPED=true
+  #
+  #     # Include restarting containers
+  #     - WATCHTOWER_INCLUDE_RESTARTING=true
+  #
+  #     # Only monitor containers with the watchtower label
+  #     - WATCHTOWER_LABEL_ENABLE=true
+  #
+  #     # Notification settings (optional)
+  #     # Uncomment and configure if you want Watchtower notifications
+  #     # - WATCHTOWER_NOTIFICATIONS=shoutrrr
+  #     # - WATCHTOWER_NOTIFICATION_URL=smtp://username:password@host:port/?from=fromAddress&to=toAddress
+  #
+  #     # Debug mode (set to true for verbose logging)
+  #     - WATCHTOWER_DEBUG=${WATCHTOWER_DEBUG:-false}
+  #
+  #     # Rolling restart (update one container at a time)
+  #     - WATCHTOWER_ROLLING_RESTART=false
+  #   volumes:
+  #     # Mount container runtime socket to allow Watchtower to manage containers
+  #
+  #     # For Docker (default):
+  #     # - /var/run/docker.sock:/var/run/docker.sock
+  #
+  #     # For Podman (rootful - running as root):
+  #     - /run/podman/podman.sock:/var/run/docker.sock
+  #
+  #     # For Podman (rootless - running as regular user):
+  #     # Replace 1000 with your UID (run: echo $UID)
+  #     # - /run/user/1000/podman/podman.sock:/var/run/docker.sock
+  #
+  #     # NOTE: Podman socket must be enabled first:
+  #     #   Rootful:   sudo systemctl enable --now podman.socket
+  #     #   Rootless:  systemctl --user enable --now podman.socket
+  #   networks:
+  #     - briefly-network
+  #   labels:
+  #     # Prevent Watchtower from updating itself
+  #     - "com.centurylinklabs.watchtower.enable=false"
 
 networks:
   briefly-network:
