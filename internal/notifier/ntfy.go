@@ -27,13 +27,24 @@ func New(topic string) *Notifier {
 	}
 }
 
+func (n *Notifier) SendStart(ctx context.Context, job *models.Job) error {
+	if n == nil || n.topic == "" {
+		return nil
+	}
+
+	title := fmt.Sprintf("Briefly: processing %s", job.ContentType)
+	message := fmt.Sprintf("Started processing %s\n\nFile: %s", job.URL, job.Filename)
+
+	return n.send(ctx, title, message, "default", "hourglass")
+}
+
 func (n *Notifier) SendSuccess(ctx context.Context, job *models.Job) error {
 	if n == nil || n.topic == "" {
 		return nil
 	}
 
 	title := fmt.Sprintf("Briefly: %s summary ready", job.ContentType)
-	message := fmt.Sprintf("Summary for %s is ready.\n\nJob ID: %s", job.URL, job.ID)
+	message := fmt.Sprintf("Summary for %s is ready.\n\nFile: %s", job.URL, job.Filename)
 
 	return n.send(ctx, title, message, "default", "white_check_mark")
 }
@@ -44,7 +55,7 @@ func (n *Notifier) SendFailure(ctx context.Context, job *models.Job) error {
 	}
 
 	title := fmt.Sprintf("Briefly: %s processing failed", job.ContentType)
-	message := fmt.Sprintf("Failed to process %s\n\nError: %s\n\nJob ID: %s", job.URL, job.Error, job.ID)
+	message := fmt.Sprintf("Failed to process %s\n\nError: %s\n\nFile: %s", job.URL, job.Error, job.Filename)
 
 	return n.send(ctx, title, message, "high", "x")
 }

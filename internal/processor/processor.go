@@ -79,10 +79,17 @@ func (p *Processor) processQueue() {
 }
 
 func (p *Processor) processJob(job *models.Job) {
-	log.Printf("Processing job %s: %s", job.ID, job.URL)
+	log.Printf("Processing job %s: %s", job.Filename, job.URL)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
+
+	// Send start notification
+	if p.notifier != nil {
+		if err := p.notifier.SendStart(ctx, job); err != nil {
+			log.Printf("Warning: failed to send start notification for job %s: %v", job.Filename, err)
+		}
+	}
 
 	// Detect content type
 	job.ContentType = DetectContentType(job.URL)
@@ -128,7 +135,7 @@ func (p *Processor) processJob(job *models.Job) {
 
 	// Save summary
 	if err := p.saveSummary(job); err != nil {
-		log.Printf("Error: failed to save summary for job %s: %v", job.ID, err)
+		log.Printf("Error: failed to save summary for job %s: %v", job.Filename, err)
 		job.Error = fmt.Sprintf("failed to save summary: %v", err)
 		p.failJob(job, fmt.Errorf("failed to save summary: %w", err))
 		return
@@ -137,7 +144,7 @@ func (p *Processor) processJob(job *models.Job) {
 	// Notify success
 	if p.notifier != nil {
 		if err := p.notifier.SendSuccess(ctx, job); err != nil {
-			log.Printf("Warning: failed to send notification for job %s: %v", job.ID, err)
+			log.Printf("Warning: failed to send notification for job %s: %v", job.Filename, err)
 		}
 	}
 
@@ -157,7 +164,7 @@ func (p *Processor) retryJob(job *models.Job, err error) {
 
 	backoff := time.Duration(job.Retries) * baseBackoff
 	log.Printf("Job %s failed (attempt %d/%d): %v. Retrying in %v",
-		job.ID, job.Retries, maxRetries, err, backoff)
+		job.Filename, job.Retries, maxRetries, err, backoff)
 
 	p.queue.Update(job)
 
@@ -173,14 +180,14 @@ func (p *Processor) failJob(job *models.Job, err error) {
 	job.Error = err.Error()
 	job.UpdatedAt = time.Now()
 
-	log.Printf("Job %s failed permanently: %v", job.ID, err)
+	log.Printf("Job %s failed permanently: %v", job.Filename, err)
 
 	// Notify failure
 	if p.notifier != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		if notifyErr := p.notifier.SendFailure(ctx, job); notifyErr != nil {
-			log.Printf("Warning: failed to send failure notification for job %s: %v", job.ID, notifyErr)
+			log.Printf("Warning: failed to send failure notification for job %s: %v", job.Filename, notifyErr)
 		}
 	}
 
@@ -191,7 +198,7 @@ func (p *Processor) completeJob(job *models.Job) {
 	job.Status = models.JobStatusCompleted
 	job.UpdatedAt = time.Now()
 
-	log.Printf("Job %s completed successfully", job.ID)
+	log.Printf("Job %s completed successfully", job.Filename)
 
 	// Remove the input file
 	if job.FilePath != "" {
