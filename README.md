@@ -104,6 +104,56 @@ To use with Podman instead of Docker:
 podman-compose up -d
 ```
 
+## Security Best Practices
+
+### Protecting Sensitive Information
+
+The `.env` file contains sensitive credentials (API keys, ntfy topics) and should be protected:
+
+**Critical:**
+- `.env` is in `.gitignore` and will never be committed to version control
+- Never share your `.env` file or commit it to any repository
+- Use `.env.example` as a template but never put real credentials in it
+
+**Recommended practices:**
+
+1. **File permissions**: Restrict access to the .env file
+   ```bash
+   chmod 600 .env
+   ```
+
+2. **ntfy.sh topics**: Choose unpredictable topic names to prevent unauthorized access
+   ```bash
+   # Bad (predictable):
+   BRIEFLY_NTFY_TOPIC=my-briefly-notifications
+
+   # Good (random/unique):
+   BRIEFLY_NTFY_TOPIC=briefly-8f3k2n9x-notifications
+   ```
+
+   Subscribe to your topic at `https://ntfy.sh/your-topic` or use the ntfy mobile app. Anyone who knows the topic name can subscribe, so treat it as sensitive.
+
+3. **Docker Secrets** (Production): For production environments, use Docker secrets instead of environment variables:
+   ```bash
+   # Create secrets
+   echo "your-api-key" | docker secret create anthropic_api_key -
+   echo "your-ntfy-topic" | docker secret create ntfy_topic -
+
+   # Use docker-compose.secrets.yml (see example in repo)
+   docker compose -f docker-compose.yml -f docker-compose.secrets.yml up -d
+   ```
+
+4. **Environment isolation**: Use different API keys and ntfy topics for development and production
+
+5. **Key rotation**: Regularly rotate API keys and update your `.env` file
+
+### What Gets Protected
+
+The `.gitignore` file ensures these sensitive items are never committed:
+- `.env` - Your actual configuration with real credentials
+- `inbox/` - Your input files may contain private URLs
+- `output/` - Generated summaries may contain sensitive content
+
 ## Configuration
 
 Briefly uses environment variables for configuration:
