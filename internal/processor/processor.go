@@ -91,8 +91,8 @@ func (p *Processor) processJob(job *models.Job) {
 		return
 	}
 
-	// Send start notification
-	if p.notifier != nil {
+	// Send start notification only on first attempt
+	if p.notifier != nil && job.Retries == 0 {
 		if err := p.notifier.SendStart(ctx, job); err != nil {
 			log.Printf("Warning: failed to send start notification for job %s: %v", job.Filename, err)
 		}
