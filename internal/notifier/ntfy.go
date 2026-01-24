@@ -62,18 +62,6 @@ func (n *Notifier) SendFailure(ctx context.Context, job *models.Job) error {
 	return n.send(ctx, title, message, "high", "x")
 }
 
-func (n *Notifier) SendRetry(ctx context.Context, job *models.Job, attempt, maxAttempts int, retryIn time.Duration) error {
-	if n == nil || n.topic == "" {
-		return nil
-	}
-
-	title := fmt.Sprintf("Briefly: %s processing error (retry %d/%d)", job.ContentType, attempt, maxAttempts)
-	message := fmt.Sprintf("Failed to process %s\n\nError: %s\n\nRetrying in %v...\n\nFile: %s",
-		job.URL, job.Error, retryIn, job.Filename)
-
-	return n.send(ctx, title, message, "default", "warning")
-}
-
 func (n *Notifier) getTagForContentType(contentType models.ContentType) string {
 	switch contentType {
 	case models.ContentTypeYouTube:
