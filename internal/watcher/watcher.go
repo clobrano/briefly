@@ -151,7 +151,7 @@ func (w *Watcher) processFile(path string) {
 		return
 	}
 
-	log.Printf("Queued job %s for URL: %s", job.ID, url)
+	log.Printf("Queued job %s for URL: %s", job.Filename, url)
 }
 
 func (w *Watcher) isValidFile(name string) bool {
