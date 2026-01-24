@@ -92,17 +92,40 @@ See `.env.example` for detailed notification configuration examples.
 
 ### Using with Podman
 
-To use with Podman instead of Docker:
+**IMPORTANT**: Using Podman requires additional setup. See [PODMAN_SETUP.md](PODMAN_SETUP.md) for complete instructions.
 
-```bash
-# Update the docker-compose.yml Watchtower volume to use Podman socket
-# Replace:
-#   - /var/run/docker.sock:/var/run/docker.sock
-# With:
-#   - /run/user/1000/podman/podman.sock:/var/run/docker.sock
+**Quick Start for Podman:**
 
-podman-compose up -d
-```
+1. Enable the Podman socket (required for Watchtower):
+   ```bash
+   # For rootful (as root)
+   sudo systemctl enable --now podman.socket
+
+   # For rootless (as regular user - recommended)
+   systemctl --user enable --now podman.socket
+   ```
+
+2. Create directories:
+   ```bash
+   mkdir -p inbox output
+   ```
+
+3. Build the image:
+   ```bash
+   podman build -t briefly:latest -f Containerfile .
+   ```
+
+4. Start services:
+   ```bash
+   # Set environment variables
+   export ANTHROPIC_API_KEY="your-key"
+   export BRIEFLY_NTFY_TOPIC="your-topic"
+
+   # Start with podman-compose
+   podman-compose up -d
+   ```
+
+For detailed setup, troubleshooting, and rootless Podman configuration, see [PODMAN_SETUP.md](PODMAN_SETUP.md).
 
 ## Security Best Practices
 

@@ -1,5 +1,13 @@
 version: '3.8'
 
+# PODMAN SETUP REQUIRED:
+# Before running with Podman, enable the Podman socket for Watchtower:
+#   Rootful (as root):    sudo systemctl enable --now podman.socket
+#   Rootless (as user):   systemctl --user enable --now podman.socket
+#
+# Without the socket, Watchtower won't be able to update containers.
+# You can still run Briefly without Watchtower by commenting out the watchtower service.
+
 # ENVIRONMENT VARIABLE PRECEDENCE:
 # Docker Compose reads variables in this order (first match wins):
 #   1. Shell environment variables (export ANTHROPIC_API_KEY=...)
@@ -24,6 +32,10 @@ services:
     image: briefly:latest
     container_name: briefly
     restart: unless-stopped
+
+    # For Podman: preserve host user permissions
+    # userns_mode: keep-id  # Uncomment for rootless Podman
+
     environment:
       # LLM Provider Configuration
       - BRIEFLY_LLM_PROVIDER=${BRIEFLY_LLM_PROVIDER:-claude}
@@ -42,9 +54,9 @@ services:
       - BRIEFLY_NTFY_TOPIC=${BRIEFLY_NTFY_TOPIC:-}
     volumes:
       # Mount host directories for input and output
-      # Adjust these paths to your needs
-      - ${BRIEFLY_HOST_INBOX:-./inbox}:/data/inbox
-      - ${BRIEFLY_HOST_OUTPUT:-./output}:/data/output
+      # :Z suffix sets SELinux context for exclusive container access
+      - ${BRIEFLY_HOST_INBOX:-./inbox}:/data/inbox:Z
+      - ${BRIEFLY_HOST_OUTPUT:-./output}:/data/output:Z
     labels:
       # Enable Watchtower monitoring for this container
       - "com.centurylinklabs.watchtower.enable=true"
@@ -84,11 +96,21 @@ services:
       # Rolling restart (update one container at a time)
       - WATCHTOWER_ROLLING_RESTART=false
     volumes:
-      # Mount Docker socket to allow Watchtower to manage containers
-      # For Docker:
-      - /var/run/docker.sock:/var/run/docker.sock
-      # For Podman (uncomment and adjust if using Podman):
+      # Mount container runtime socket to allow Watchtower to manage containers
+
+      # For Docker (default):
+      # - /var/run/docker.sock:/var/run/docker.sock
+
+      # For Podman (rootful - running as root):
+      - /run/podman/podman.sock:/var/run/docker.sock
+
+      # For Podman (rootless - running as regular user):
+      # Replace 1000 with your UID (run: echo $UID)
       # - /run/user/1000/podman/podman.sock:/var/run/docker.sock
+
+      # NOTE: Podman socket must be enabled first:
+      #   Rootful:   sudo systemctl enable --now podman.socket
+      #   Rootless:  systemctl --user enable --now podman.socket
     networks:
       - briefly-network
     labels:
