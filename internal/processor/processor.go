@@ -91,8 +91,8 @@ func (p *Processor) processJob(job *models.Job) {
 		return
 	}
 
-	// Send start notification
-	if p.notifier != nil {
+	// Send start notification only on first attempt
+	if p.notifier != nil && job.Retries == 0 {
 		if err := p.notifier.SendStart(ctx, job); err != nil {
 			log.Printf("Warning: failed to send start notification for job %s: %v", job.Filename, err)
 		}
@@ -165,6 +165,15 @@ func (p *Processor) retryJob(job *models.Job, err error) {
 	backoff := time.Duration(job.Retries) * baseBackoff
 	log.Printf("Job %s failed (attempt %d/%d): %v. Retrying in %v",
 		job.Filename, job.Retries, maxRetries, err, backoff)
+
+	// Send retry notification
+	if p.notifier != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if notifyErr := p.notifier.SendRetry(ctx, job, job.Retries, maxRetries, backoff); notifyErr != nil {
+			log.Printf("Warning: failed to send retry notification for job %s: %v", job.Filename, notifyErr)
+		}
+	}
 
 	p.queue.Update(job)
 
