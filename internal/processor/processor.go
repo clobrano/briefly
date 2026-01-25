@@ -252,6 +252,9 @@ func (p *Processor) getOutputPath(job *models.Job) string {
 		baseName = job.ID
 	}
 
+	// Sanitize filename for cross-platform compatibility (Syncthing, etc.)
+	baseName = SanitizeFilename(baseName)
+
 	filename := fmt.Sprintf("%s.md", baseName)
 	return filepath.Join(p.cfg.OutputDir, filename)
 }
