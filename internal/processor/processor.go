@@ -91,6 +91,18 @@ func (p *Processor) processJob(job *models.Job) {
 		return
 	}
 
+	// Check if output already exists (skip duplicate processing)
+	if p.outputExists(job) {
+		log.Printf("Skipping job %s: output file already exists", job.Filename)
+		if p.notifier != nil {
+			if err := p.notifier.SendSkipped(ctx, job); err != nil {
+				log.Printf("Warning: failed to send skipped notification for job %s: %v", job.Filename, err)
+			}
+		}
+		p.completeJob(job)
+		return
+	}
+
 	// Send start notification only on first attempt
 	if p.notifier != nil && job.Retries == 0 {
 		if err := p.notifier.SendStart(ctx, job); err != nil {
@@ -208,11 +220,7 @@ func (p *Processor) completeJob(job *models.Job) {
 	p.queue.Remove(job.ID)
 }
 
-func (p *Processor) saveSummary(job *models.Job) error {
-	if err := os.MkdirAll(p.cfg.OutputDir, 0755); err != nil {
-		return err
-	}
-
+func (p *Processor) getOutputPath(job *models.Job) string {
 	// Use input filename as base for output, fallback to job ID
 	var baseName string
 	if job.FilePath != "" {
@@ -224,7 +232,21 @@ func (p *Processor) saveSummary(job *models.Job) error {
 	}
 
 	filename := fmt.Sprintf("%s.md", baseName)
-	path := filepath.Join(p.cfg.OutputDir, filename)
+	return filepath.Join(p.cfg.OutputDir, filename)
+}
+
+func (p *Processor) outputExists(job *models.Job) bool {
+	path := p.getOutputPath(job)
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+func (p *Processor) saveSummary(job *models.Job) error {
+	if err := os.MkdirAll(p.cfg.OutputDir, 0755); err != nil {
+		return err
+	}
+
+	path := p.getOutputPath(job)
 
 	content := fmt.Sprintf("# Summary\n\n**URL:** %s\n**Type:** %s\n**Generated:** %s\n\n---\n\n%s",
 		job.URL,
