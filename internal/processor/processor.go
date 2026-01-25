@@ -2,6 +2,7 @@ package processor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -15,6 +16,9 @@ import (
 	"github.com/clobrano/briefly/internal/queue"
 	"github.com/clobrano/briefly/internal/summarizer"
 )
+
+// ErrOutputExists is returned when attempting to write a summary that already exists
+var ErrOutputExists = errors.New("output file already exists")
 
 const (
 	maxRetries    = 3
@@ -91,6 +95,24 @@ func (p *Processor) processJob(job *models.Job) {
 		return
 	}
 
+	// Check if output already exists (skip duplicate processing)
+	exists, err := p.outputExists(job)
+	if err != nil {
+		log.Printf("Error checking output file for job %s: %v", job.Filename, err)
+		p.failJob(job, err)
+		return
+	}
+	if exists {
+		log.Printf("Skipping job %s: output file already exists", job.Filename)
+		if p.notifier != nil {
+			if err := p.notifier.SendSkipped(ctx, job); err != nil {
+				log.Printf("Warning: failed to send skipped notification for job %s: %v", job.Filename, err)
+			}
+		}
+		p.completeJob(job)
+		return
+	}
+
 	// Send start notification only on first attempt
 	if p.notifier != nil && job.Retries == 0 {
 		if err := p.notifier.SendStart(ctx, job); err != nil {
@@ -135,6 +157,17 @@ func (p *Processor) processJob(job *models.Job) {
 
 	// Save summary
 	if err := p.saveSummary(job); err != nil {
+		// Race condition: another worker already created the output file
+		if errors.Is(err, ErrOutputExists) {
+			log.Printf("Skipping job %s: output file created by concurrent worker", job.Filename)
+			if p.notifier != nil {
+				if notifyErr := p.notifier.SendSkipped(ctx, job); notifyErr != nil {
+					log.Printf("Warning: failed to send skipped notification for job %s: %v", job.Filename, notifyErr)
+				}
+			}
+			p.completeJob(job)
+			return
+		}
 		log.Printf("Error: failed to save summary for job %s: %v", job.Filename, err)
 		job.Error = fmt.Sprintf("failed to save summary: %v", err)
 		p.failJob(job, fmt.Errorf("failed to save summary: %w", err))
@@ -208,11 +241,7 @@ func (p *Processor) completeJob(job *models.Job) {
 	p.queue.Remove(job.ID)
 }
 
-func (p *Processor) saveSummary(job *models.Job) error {
-	if err := os.MkdirAll(p.cfg.OutputDir, 0755); err != nil {
-		return err
-	}
-
+func (p *Processor) getOutputPath(job *models.Job) string {
 	// Use input filename as base for output, fallback to job ID
 	var baseName string
 	if job.FilePath != "" {
@@ -224,7 +253,28 @@ func (p *Processor) saveSummary(job *models.Job) error {
 	}
 
 	filename := fmt.Sprintf("%s.md", baseName)
-	path := filepath.Join(p.cfg.OutputDir, filename)
+	return filepath.Join(p.cfg.OutputDir, filename)
+}
+
+func (p *Processor) outputExists(job *models.Job) (bool, error) {
+	path := p.getOutputPath(job)
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	// Other errors (permission denied, etc.)
+	return false, fmt.Errorf("failed to check output file: %w", err)
+}
+
+func (p *Processor) saveSummary(job *models.Job) error {
+	if err := os.MkdirAll(p.cfg.OutputDir, 0755); err != nil {
+		return err
+	}
+
+	path := p.getOutputPath(job)
 
 	content := fmt.Sprintf("# Summary\n\n**URL:** %s\n**Type:** %s\n**Generated:** %s\n\n---\n\n%s",
 		job.URL,
@@ -233,5 +283,16 @@ func (p *Processor) saveSummary(job *models.Job) error {
 		job.Summary,
 	)
 
-	return os.WriteFile(path, []byte(content), 0644)
+	// Use O_EXCL for atomic creation - fails if file already exists (race condition)
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+	if err != nil {
+		if os.IsExist(err) {
+			return ErrOutputExists
+		}
+		return err
+	}
+	defer f.Close()
+
+	_, err = f.WriteString(content)
+	return err
 }

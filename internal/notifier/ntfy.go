@@ -62,6 +62,17 @@ func (n *Notifier) SendFailure(ctx context.Context, job *models.Job) error {
 	return n.send(ctx, title, message, "high", "x")
 }
 
+func (n *Notifier) SendSkipped(ctx context.Context, job *models.Job) error {
+	if n == nil || n.topic == "" {
+		return nil
+	}
+
+	title := "Briefly: skipped duplicate"
+	message := fmt.Sprintf("Already processed %s\n\nFile: %s", job.URL, job.Filename)
+
+	return n.send(ctx, title, message, "low", "repeat")
+}
+
 func (n *Notifier) getTagForContentType(contentType models.ContentType) string {
 	switch contentType {
 	case models.ContentTypeYouTube:
