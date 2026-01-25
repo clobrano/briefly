@@ -139,19 +139,33 @@ func (w *Watcher) debounceLoop() {
 }
 
 func (w *Watcher) processFile(path string) {
-	url, customPrompt, err := parseInputFile(path)
+	result, err := parseInputFile(path)
 	if err != nil {
 		log.Printf("Error parsing file %s: %v", path, err)
 		return
 	}
 
-	job := models.NewJob(path, url, customPrompt)
+	var job *models.Job
+	if result.IsDirectText {
+		if result.Text == "" {
+			log.Printf("Error: empty text content in file %s", path)
+			return
+		}
+		job = models.NewJobWithContent(path, result.Text, result.CustomPrompt)
+		log.Printf("Queued job %s for direct text summarization", job.Filename)
+	} else {
+		if result.URL == "" {
+			log.Printf("Error: empty URL in file %s", path)
+			return
+		}
+		job = models.NewJob(path, result.URL, result.CustomPrompt)
+		log.Printf("Queued job %s for URL: %s", job.Filename, result.URL)
+	}
+
 	if err := w.queue.Enqueue(job); err != nil {
 		log.Printf("Error enqueuing job for %s: %v", path, err)
 		return
 	}
-
-	log.Printf("Queued job %s for URL: %s", job.Filename, url)
 }
 
 func (w *Watcher) isValidFile(name string) bool {
@@ -161,13 +175,22 @@ func (w *Watcher) isValidFile(name string) bool {
 
 type inputFile struct {
 	URL    string `yaml:"url"`
+	Text   string `yaml:"text"`
 	Prompt string `yaml:"prompt"`
 }
 
-func parseInputFile(path string) (url, customPrompt string, err error) {
+// parseResult holds the result of parsing an input file
+type parseResult struct {
+	URL          string
+	Text         string
+	CustomPrompt string
+	IsDirectText bool
+}
+
+func parseInputFile(path string) (*parseResult, error) {
 	file, err := os.Open(path)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 	defer file.Close()
 
@@ -177,7 +200,7 @@ func parseInputFile(path string) (url, customPrompt string, err error) {
 		lines = append(lines, scanner.Text())
 	}
 	if err := scanner.Err(); err != nil {
-		return "", "", err
+		return nil, err
 	}
 
 	content := strings.Join(lines, "\n")
@@ -188,16 +211,50 @@ func parseInputFile(path string) (url, customPrompt string, err error) {
 		parts := strings.SplitN(content, "---", 3)
 		if len(parts) >= 3 {
 			var input inputFile
-			if err := yaml.Unmarshal([]byte(parts[1]), &input); err == nil && input.URL != "" {
-				return strings.TrimSpace(input.URL), strings.TrimSpace(input.Prompt), nil
+			if err := yaml.Unmarshal([]byte(parts[1]), &input); err == nil {
+				// Check if text field is provided (direct text summarization)
+				if input.Text != "" {
+					return &parseResult{
+						Text:         strings.TrimSpace(input.Text),
+						CustomPrompt: strings.TrimSpace(input.Prompt),
+						IsDirectText: true,
+					}, nil
+				}
+				// URL-based summarization
+				if input.URL != "" {
+					return &parseResult{
+						URL:          strings.TrimSpace(input.URL),
+						CustomPrompt: strings.TrimSpace(input.Prompt),
+						IsDirectText: false,
+					}, nil
+				}
 			}
 		}
 	}
 
-	// Simple URL-only format
+	// Simple format: check if content looks like a URL
 	if len(lines) > 0 {
-		return strings.TrimSpace(lines[0]), "", nil
+		firstLine := strings.TrimSpace(lines[0])
+		if isURL(firstLine) {
+			return &parseResult{
+				URL:          firstLine,
+				IsDirectText: false,
+			}, nil
+		}
 	}
 
-	return "", "", nil
+	// Treat as direct text if no URL found
+	if content != "" {
+		return &parseResult{
+			Text:         content,
+			IsDirectText: true,
+		}, nil
+	}
+
+	return &parseResult{}, nil
+}
+
+// isURL checks if the string looks like a URL
+func isURL(s string) bool {
+	return strings.HasPrefix(s, "http://") || strings.HasPrefix(s, "https://")
 }

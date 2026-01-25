@@ -28,12 +28,23 @@ const DefaultTextPrompt = `You are analyzing a web article. Please provide a com
 
 Keep the summary concise but informative. Use bullet points where appropriate.`
 
+const DefaultDirectTextPrompt = `You are analyzing provided text content. Please provide a comprehensive summary that includes:
+
+1. **Main Topic**: What is the text about?
+2. **Key Points**: List the main arguments or information presented
+3. **Important Details**: Any statistics, quotes, or specific examples mentioned
+4. **Conclusion**: What are the main takeaways?
+
+Keep the summary concise but informative. Use bullet points where appropriate.`
+
 func GetDefaultPrompt(contentType models.ContentType) string {
 	switch contentType {
 	case models.ContentTypeYouTube:
 		return DefaultYouTubePrompt
 	case models.ContentTypeText:
 		return DefaultTextPrompt
+	case models.ContentTypeDirectText:
+		return DefaultDirectTextPrompt
 	default:
 		return DefaultTextPrompt
 	}

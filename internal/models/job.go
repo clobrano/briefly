@@ -9,9 +9,10 @@ import (
 type ContentType string
 
 const (
-	ContentTypeYouTube ContentType = "youtube"
-	ContentTypeText    ContentType = "text"
-	ContentTypeUnknown ContentType = "unknown"
+	ContentTypeYouTube     ContentType = "youtube"
+	ContentTypeText        ContentType = "text"
+	ContentTypeDirectText  ContentType = "direct_text"
+	ContentTypeUnknown     ContentType = "unknown"
 )
 
 type JobStatus string
@@ -52,6 +53,27 @@ func NewJob(filePath, url, customPrompt string) *Job {
 		URL:          url,
 		CustomPrompt: customPrompt,
 		ContentType:  ContentTypeUnknown,
+		Status:       JobStatusPending,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+}
+
+// NewJobWithContent creates a job with direct text content (no URL needed)
+func NewJobWithContent(filePath, content, customPrompt string) *Job {
+	now := time.Now()
+	// Extract filename without extension
+	base := filepath.Base(filePath)
+	filename := strings.TrimSuffix(base, filepath.Ext(base))
+
+	return &Job{
+		ID:           generateID(),
+		Filename:     filename,
+		FilePath:     filePath,
+		URL:          "",
+		CustomPrompt: customPrompt,
+		ContentType:  ContentTypeDirectText,
+		Content:      content,
 		Status:       JobStatusPending,
 		CreatedAt:    now,
 		UpdatedAt:    now,

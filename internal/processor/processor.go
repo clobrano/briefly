@@ -83,16 +83,22 @@ func (p *Processor) processQueue() {
 }
 
 func (p *Processor) processJob(job *models.Job) {
-	log.Printf("Processing job %s: %s", job.Filename, job.URL)
+	if job.ContentType == models.ContentTypeDirectText {
+		log.Printf("Processing job %s: direct text summarization", job.Filename)
+	} else {
+		log.Printf("Processing job %s: %s", job.Filename, job.URL)
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
-	// Detect content type first
-	job.ContentType = DetectContentType(job.URL)
-	if job.ContentType == models.ContentTypeUnknown {
-		p.failJob(job, fmt.Errorf("unknown content type for URL: %s", job.URL))
-		return
+	// Detect content type if not already set (direct text jobs already have content type set)
+	if job.ContentType != models.ContentTypeDirectText {
+		job.ContentType = DetectContentType(job.URL)
+		if job.ContentType == models.ContentTypeUnknown {
+			p.failJob(job, fmt.Errorf("unknown content type for URL: %s", job.URL))
+			return
+		}
 	}
 
 	// Check if output already exists (skip duplicate processing)
@@ -120,30 +126,32 @@ func (p *Processor) processJob(job *models.Job) {
 		}
 	}
 
-	// Extract content
-	var content string
-	var err error
+	// Extract content (skip for direct text - content is already provided)
+	if job.ContentType != models.ContentTypeDirectText {
+		var content string
+		var extractErr error
 
-	switch job.ContentType {
-	case models.ContentTypeYouTube:
-		content, err = p.ytProc.Process(ctx, job.URL)
-	case models.ContentTypeText:
-		content, err = p.textProc.Extract(ctx, job.URL)
-	}
+		switch job.ContentType {
+		case models.ContentTypeYouTube:
+			content, extractErr = p.ytProc.Process(ctx, job.URL)
+		case models.ContentTypeText:
+			content, extractErr = p.textProc.Extract(ctx, job.URL)
+		}
 
-	if err != nil {
-		if p.shouldRetry(job) {
-			p.retryJob(job, err)
+		if extractErr != nil {
+			if p.shouldRetry(job) {
+				p.retryJob(job, extractErr)
+				return
+			}
+			p.failJob(job, extractErr)
 			return
 		}
-		p.failJob(job, err)
-		return
+
+		job.Content = content
 	}
 
-	job.Content = content
-
 	// Summarize
-	summary, err := p.summarizer.Summarize(ctx, content, job.CustomPrompt, job.ContentType)
+	summary, err := p.summarizer.Summarize(ctx, job.Content, job.CustomPrompt, job.ContentType)
 	if err != nil {
 		if p.shouldRetry(job) {
 			p.retryJob(job, err)
@@ -276,12 +284,21 @@ func (p *Processor) saveSummary(job *models.Job) error {
 
 	path := p.getOutputPath(job)
 
-	content := fmt.Sprintf("# Summary\n\n**URL:** %s\n**Type:** %s\n**Generated:** %s\n\n---\n\n%s",
-		job.URL,
-		job.ContentType,
-		time.Now().Format(time.RFC3339),
-		job.Summary,
-	)
+	var content string
+	if job.ContentType == models.ContentTypeDirectText {
+		content = fmt.Sprintf("# Summary\n\n**Source:** Direct text input\n**Type:** %s\n**Generated:** %s\n\n---\n\n%s",
+			job.ContentType,
+			time.Now().Format(time.RFC3339),
+			job.Summary,
+		)
+	} else {
+		content = fmt.Sprintf("# Summary\n\n**URL:** %s\n**Type:** %s\n**Generated:** %s\n\n---\n\n%s",
+			job.URL,
+			job.ContentType,
+			time.Now().Format(time.RFC3339),
+			job.Summary,
+		)
+	}
 
 	// Use O_EXCL for atomic creation - fails if file already exists (race condition)
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
