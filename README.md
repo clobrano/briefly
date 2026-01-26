@@ -56,6 +56,7 @@ Briefly uses environment variables for configuration:
 | `GOOGLE_API_KEY` | - | API key for Gemini (required if using gemini) |
 | `BRIEFLY_NTFY_TOPIC` | - | ntfy.sh topic for notifications (optional) |
 | `BRIEFLY_WHISPER_MODEL` | `base` | Whisper model: `tiny`, `base`, `small`, `medium`, `large` |
+| `BRIEFLY_WHISPER_THREADS` | (all) | Limit CPU threads for Whisper (reduces memory usage) |
 
 ### LLM Model Defaults
 
@@ -231,6 +232,32 @@ sudo dnf install ffmpeg
 # On Ubuntu/Debian
 sudo apt install ffmpeg
 ```
+
+### Whisper killed (out of memory)
+
+If Whisper transcription fails with `signal: killed`, the process is being terminated by the OS due to memory exhaustion. This is common with long videos on memory-constrained systems.
+
+**Solutions:**
+
+1. **Use a smaller model** - The `tiny` model uses significantly less memory:
+   ```bash
+   export BRIEFLY_WHISPER_MODEL=tiny
+   ```
+
+2. **Limit CPU threads** - Reducing threads decreases memory usage:
+   ```bash
+   export BRIEFLY_WHISPER_THREADS=2
+   ```
+
+3. **Increase swap space** - Add temporary swap for large jobs:
+   ```bash
+   sudo fallocate -l 4G /swapfile
+   sudo chmod 600 /swapfile
+   sudo mkswap /swapfile
+   sudo swapon /swapfile
+   ```
+
+4. **Process shorter videos** - Videos over 30 minutes may require the `tiny` model or additional memory
 
 ### API errors
 

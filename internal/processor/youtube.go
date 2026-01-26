@@ -11,15 +11,17 @@ import (
 )
 
 type YouTubeProcessor struct {
-	whisperModel string
-	tempDir      string
+	whisperModel   string
+	whisperThreads string
+	tempDir        string
 }
 
-func NewYouTubeProcessor(whisperModel string) *YouTubeProcessor {
+func NewYouTubeProcessor(whisperModel, whisperThreads string) *YouTubeProcessor {
 	tempDir := os.TempDir()
 	return &YouTubeProcessor{
-		whisperModel: whisperModel,
-		tempDir:      tempDir,
+		whisperModel:   whisperModel,
+		whisperThreads: whisperThreads,
+		tempDir:        tempDir,
 	}
 }
 
@@ -87,6 +89,13 @@ func (y *YouTubeProcessor) transcribe(ctx context.Context, audioPath string) (st
 		"--output_format", "txt",
 		"--output_dir", workDir,
 		"--language", "en", // Default to English, could be made configurable
+		"--device", "cpu",  // Explicitly use CPU to avoid GPU memory issues
+		"--fp16", "False",  // Disable FP16 on CPU to suppress warning
+	}
+
+	// Limit CPU threads if configured (helps reduce memory usage)
+	if y.whisperThreads != "" {
+		args = append(args, "--threads", y.whisperThreads)
 	}
 
 	// Use pre-downloaded models if available (container environment)

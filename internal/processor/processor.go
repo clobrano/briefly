@@ -40,7 +40,7 @@ func New(cfg *config.Config, q *queue.Queue, sum summarizer.Summarizer, ntfy *no
 		cfg:        cfg,
 		queue:      q,
 		textProc:   NewTextExtractor(),
-		ytProc:     NewYouTubeProcessor(cfg.WhisperModel),
+		ytProc:     NewYouTubeProcessor(cfg.WhisperModel, cfg.WhisperThreads),
 		summarizer: sum,
 		notifier:   ntfy,
 		done:       make(chan struct{}),
