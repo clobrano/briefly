@@ -21,18 +21,18 @@ import (
 var ErrOutputExists = errors.New("output file already exists")
 
 const (
-	maxRetries    = 3
-	baseBackoff   = 5 * time.Second
+	maxRetries  = 3
+	baseBackoff = 5 * time.Second
 )
 
 type Processor struct {
-	cfg         *config.Config
-	queue       *queue.Queue
-	textProc    *TextExtractor
-	ytProc      *YouTubeProcessor
-	summarizer  summarizer.Summarizer
-	notifier    *notifier.Notifier
-	done        chan struct{}
+	cfg        *config.Config
+	queue      *queue.Queue
+	textProc   *TextExtractor
+	ytProc     *YouTubeProcessor
+	summarizer summarizer.Summarizer
+	notifier   *notifier.Notifier
+	done       chan struct{}
 }
 
 func New(cfg *config.Config, q *queue.Queue, sum summarizer.Summarizer, ntfy *notifier.Notifier) *Processor {
@@ -122,7 +122,6 @@ func (p *Processor) processJob(job *models.Job) {
 
 	// Extract content
 	var content string
-	var err error
 
 	switch job.ContentType {
 	case models.ContentTypeYouTube:
