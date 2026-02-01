@@ -1,0 +1,39 @@
+# Environment files with sensitive credentials
+.env
+
+# Inbox and output directories (contain user data)
+inbox/
+output/
+
+# Go build artifacts
+briefly
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go test files
+*.test
+*.out
+
+# Go workspace file
+go.work
+
+# Dependency directories
+vendor/
+
+# IDE specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.log

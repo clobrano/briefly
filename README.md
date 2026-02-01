@@ -42,6 +42,225 @@ go build -o briefly ./cmd/briefly
 podman build -t briefly:latest -f Containerfile .
 ```
 
+## Docker Compose Configuration
+
+The project includes a `docker-compose.yml` file that sets up Briefly with Watchtower for automatic image updates.
+
+### Features
+
+- **Automatic updates**: Watchtower checks for new images every 24 hours (configurable)
+- **Zero-downtime updates**: Containers are restarted automatically when updates are available
+- **Cleanup**: Old images are removed after successful updates
+- **Easy configuration**: All settings in `.env` file
+
+### Quick Start
+
+1. Copy the example environment file:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Edit `.env` and set your API key:
+   ```bash
+   ANTHROPIC_API_KEY=your-actual-api-key-here
+   ```
+
+3. Start the services:
+   ```bash
+   docker compose up -d
+   ```
+
+4. Check the logs:
+   ```bash
+   docker compose logs -f briefly
+   ```
+
+### Watchtower Configuration
+
+Watchtower settings in `.env`:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `WATCHTOWER_POLL_INTERVAL` | `86400` | Update check interval in seconds (86400 = 24 hours) |
+| `WATCHTOWER_DEBUG` | `false` | Enable verbose logging |
+
+**Notification options:**
+- Email: Set `WATCHTOWER_NOTIFICATION_URL` to SMTP URL
+- ntfy.sh: Set `WATCHTOWER_NOTIFICATION_URL` to `ntfy://ntfy.sh/your-topic`
+
+See `.env.example` for detailed notification configuration examples.
+
+### Using with Podman
+
+**IMPORTANT**: Using Podman requires additional setup. See [PODMAN_SETUP.md](PODMAN_SETUP.md) for complete instructions.
+
+**Quick Start for Podman:**
+
+1. Enable the Podman socket (required for Watchtower):
+   ```bash
+   # For rootful (as root)
+   sudo systemctl enable --now podman.socket
+
+   # For rootless (as regular user - recommended)
+   systemctl --user enable --now podman.socket
+   ```
+
+2. Create directories:
+   ```bash
+   mkdir -p inbox output
+   ```
+
+3. Build the image:
+   ```bash
+   podman build -t briefly:latest -f Containerfile .
+   ```
+
+4. Start services:
+   ```bash
+   # Set environment variables
+   export ANTHROPIC_API_KEY="your-key"
+   export BRIEFLY_NTFY_TOPIC="your-topic"
+
+   # Start with podman-compose
+   podman-compose up -d
+   ```
+
+For detailed setup, troubleshooting, and rootless Podman configuration, see [PODMAN_SETUP.md](PODMAN_SETUP.md).
+
+## Security Best Practices
+
+### Protecting Sensitive Information
+
+**IMPORTANT:** The `.env` file stores secrets in **plaintext** on your filesystem. While `.gitignore` prevents it from being committed to version control, anyone with filesystem access can read it.
+
+For better security, consider **not storing secrets in `.env` files**:
+
+### Option 1: Docker Secrets (Recommended for Production)
+
+Secrets are encrypted and never exposed in plaintext:
+
+```bash
+# Create secrets (stored encrypted by Docker)
+echo "your-api-key" | docker secret create anthropic_api_key -
+echo "your-ntfy-topic" | docker secret create ntfy_topic -
+echo "your-google-key" | docker secret create google_api_key -
+
+# Enable swarm mode (required for secrets)
+docker swarm init
+
+# Deploy with secrets
+docker stack deploy -c docker-compose.yml -c docker-compose.secrets.yml briefly
+```
+
+**Benefits:**
+- Secrets never written to disk in plaintext
+- Not visible in container inspect or logs
+- Encrypted at rest and in transit
+
+### Option 2: Environment Variables (Without .env)
+
+Docker Compose automatically reads from your shell environment, so you **don't need a .env file**.
+
+Best for personal servers where you control the environment:
+
+```bash
+# Option A: Set in current shell
+export ANTHROPIC_API_KEY="your-api-key"
+export BRIEFLY_NTFY_TOPIC="your-topic-name"
+
+# Start without .env file (compose reads from environment)
+docker compose up -d
+```
+
+```bash
+# Option B: Pass directly to docker compose
+ANTHROPIC_API_KEY="your-key" BRIEFLY_NTFY_TOPIC="your-topic" docker compose up -d
+```
+
+```bash
+# Option C: Integrate with a secrets vault
+# HashiCorp Vault
+export ANTHROPIC_API_KEY=$(vault kv get -field=api_key secret/briefly)
+export BRIEFLY_NTFY_TOPIC=$(vault kv get -field=ntfy_topic secret/briefly)
+docker compose up -d
+
+# 1Password CLI
+export ANTHROPIC_API_KEY=$(op read "op://Personal/Briefly/api_key")
+export BRIEFLY_NTFY_TOPIC=$(op read "op://Personal/Briefly/ntfy_topic")
+docker compose up -d
+
+# AWS Secrets Manager
+export ANTHROPIC_API_KEY=$(aws secretsmanager get-secret-value --secret-id briefly/api_key --query SecretString --output text)
+docker compose up -d
+```
+
+```bash
+# Option D: Create systemd service with environment variables
+# /etc/systemd/system/briefly.service
+[Service]
+Environment="ANTHROPIC_API_KEY=your-api-key"
+Environment="BRIEFLY_NTFY_TOPIC=your-topic-name"
+Environment="BRIEFLY_HOST_INBOX=/home/user/inbox"
+Environment="BRIEFLY_HOST_OUTPUT=/home/user/output"
+ExecStart=/usr/bin/docker compose -f /path/to/docker-compose.yml up
+WorkingDirectory=/path/to/briefly
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**Benefits:**
+- Secrets only in memory/process environment
+- Not written to disk (unless shell history enabled)
+- Integrates with existing secrets management tools
+- No .env file to secure or manage
+
+### Option 3: .env File (Least Secure)
+
+Only use for quick testing if you accept the risks:
+
+```bash
+cp .env.example .env
+chmod 600 .env  # Restrict to owner only
+nano .env       # Add your secrets
+```
+
+**Limitations:**
+- Secrets stored in **plaintext** on disk
+- Visible to anyone with filesystem access
+- Can be leaked in backups, logs, or snapshots
+
+### ntfy.sh Topic Security
+
+**Important:** Anyone who knows your ntfy topic name can subscribe to your notifications.
+
+Use your preferred topic name, but **keep it secret**:
+- ✅ Store it using Docker secrets (never on disk)
+- ✅ Set it as an environment variable (only in memory)
+- ⚠️ If using `.env`, ensure `chmod 600 .env`
+- ❌ Never commit it to version control
+- ❌ Never share it publicly
+
+Subscribe to your topic at `https://ntfy.sh/your-topic` or use the ntfy mobile app.
+
+### Additional Security
+
+1. **Environment isolation**: Use different API keys and ntfy topics for development and production
+
+2. **Key rotation**: Regularly rotate API keys and update your configuration
+
+3. **Audit access**: Monitor who has access to your server/filesystem
+
+4. **Backups**: Ensure backup systems don't expose `.env` files
+
+### What .gitignore Protects
+
+These files are excluded from version control:
+- `.env` - Configuration with credentials (still visible on filesystem!)
+- `inbox/` - Input files may contain private URLs
+- `output/` - Generated summaries may contain sensitive content
+
 ## Configuration
 
 Briefly uses environment variables for configuration:
@@ -90,7 +309,31 @@ mkdir -p $BRIEFLY_WATCH_DIR $BRIEFLY_OUTPUT_DIR
 
 ### Running with container
 
-**Recommended (rootless Podman with user namespace mapping):**
+**Recommended (Docker Compose with automatic updates):**
+
+```bash
+# Copy and configure environment file
+cp .env.example .env
+# Edit .env with your API keys and settings
+nano .env
+
+# Start services (Briefly + Watchtower for auto-updates)
+docker compose up -d
+
+# View logs
+docker compose logs -f briefly
+
+# Stop services
+docker compose down
+```
+
+Docker Compose automatically:
+- Pulls and runs the Briefly service
+- Configures Watchtower to check for image updates every 24 hours
+- Restarts containers when updates are available
+- Cleans up old images
+
+**Alternative (Manual Podman with user namespace mapping):**
 
 ```bash
 podman run -d \
